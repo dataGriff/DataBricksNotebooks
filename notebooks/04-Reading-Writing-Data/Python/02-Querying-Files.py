@@ -301,7 +301,12 @@ display(spark.sql("SELECT count(*) FROM womenBornAfter1990 where firstName = 'Ma
 
 # TODO
 from pyspark.sql.functions import count, desc
-top10FemaleFirstNamesDF = # FILL_IN
+top10FemaleFirstNamesDF = (peopleDF.select("firstName") 
+  .filter("gender = 'F' ") 
+  .groupBy("firstName") 
+  .agg(count("firstName").alias("total"))         
+).orderBy(desc("total"),"firstName").limit(10)
+top10FemaleFirstNamesDF.show()
 
 # COMMAND ----------
 
@@ -338,7 +343,7 @@ print("Tests passed!")
 
 # TODO
 top10FemaleFirstNamesDF.createOrReplaceTempView("Top10FemaleFirstNames")
-resultsDF = # FILL_IN
+resultsDF = spark.sql("SELECT * FROM Top10FemaleFirstNames")
 display(resultsDF)
 
 # COMMAND ----------
