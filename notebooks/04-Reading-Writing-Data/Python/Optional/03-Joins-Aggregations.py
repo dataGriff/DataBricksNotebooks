@@ -44,7 +44,7 @@
 
 # TODO
 
-ssaDF = # FILL_IN
+ssaDF = spark.read.parquet("/mnt/training/ssn/names-1880-2016.parquet/")
 
 ssaDF.printSchema()
 
@@ -62,9 +62,27 @@ ssaDF.printSchema()
 # TODO
 
 from pyspark.sql.functions import col, max
-maxNamesDF = # FILL_IN
-outerQueryDF = # FILL_IN
-joinedQueryDF = # FILL_IN
+maxNamesDF = (ssaDF
+  .select(col("year").alias("maxYear"), "gender", "total")
+  .groupBy("maxYear", "gender") 
+  .agg(max(col("total")).alias("total")) 
+  .filter("gender = 'F' ") 
+  .filter("maxYear in (1885, 1915, 1945, 1975, 2005)")      
+)
+
+## display(maxNamesDF)
+
+outerQueryDF = (ssaDF 
+  .select("firstName", "year",col("total").alias("outerTotal")) 
+  .filter("gender = 'F' ") 
+  .filter("year in (1885, 1915, 1945, 1975, 2005)") 
+)
+
+joinedQueryDF = (maxNamesDF 
+  .join(outerQueryDF, col("outerTotal") == col("total")) 
+  .orderBy("year") 
+  .drop("maxYear", "outerTotal")
+)
 
 joinedQueryDF.show()
 
