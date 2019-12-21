@@ -41,8 +41,7 @@
 
 # COMMAND ----------
 
-# TODO
-FILL_IN
+# MAGIC %fs ls mnt/training/twitter/firehose/2018/01/08/18/
 
 # COMMAND ----------
 
@@ -61,7 +60,9 @@ FILL_IN
 # COMMAND ----------
 
 # TODO
-df = # <<FILL_IN>>
+df = spark.read.json("/mnt/training/twitter/firehose/2018/01/08/18/twitterstream-1-2018-01-08-18-48-00-bcf3d615-9c04-44ec-aac9-25f966490aa4")
+
+df.show()
 
 # COMMAND ----------
 
@@ -81,8 +82,7 @@ print("Tests passed!")
 
 # COMMAND ----------
 
-# TODO
-FILL_IN
+df.printSchema()
 
 # COMMAND ----------
 
@@ -92,7 +92,7 @@ FILL_IN
 # COMMAND ----------
 
 # TODO
-dfCount = # FILL_IN
+dfCount = df.count()
 
 # COMMAND ----------
 
@@ -154,11 +154,29 @@ print("Tests passed!")
 
 # COMMAND ----------
 
-# TODO
-path = "/mnt/training/twitter/firehose/2018/01/08/18/twitterstream-1-2018-01-08-18-48-00-bcf3d615-9c04-44ec-aac9-25f966490aa4"
+display(df).select("tweet")
 
-tweetSchema = # FILL_IN
-tweetDF = # FILL_IN
+# COMMAND ----------
+
+from pyspark.sql.types import StructField, StructType, StringType, LongType
+
+path = "/mnt/training/twitter/firehose/2018/01/08/18/twitterstream-1-2018-01-08-18-48-00-bcf3d615-9c04-44ec-aac9-25f966490aa4"
+# path = "/mnt/training/twitter/firehose/2018/*/*/*/*"
+
+
+tweetSchema = StructType([
+  StructField("id", LongType(), True),
+  StructField("user", StructType([
+    StructField("id", LongType(), True)
+  ]), True),  
+  StructField("lang", StringType(), True),
+  StructField("text", StringType(), True),
+  StructField("created_at", StringType(), True)
+])
+
+tweetDF = spark.read.schema(tweetSchema).json(path)
+
+display(tweetDF)
 
 # COMMAND ----------
 
@@ -187,10 +205,43 @@ print("Tests passed!")
 
 # COMMAND ----------
 
-# TODO
+from pyspark.sql.types import StructField, StructType, ArrayType, StringType, IntegerType, LongType
+
 path = "/mnt/training/twitter/firehose/2018/01/08/18/twitterstream-1-2018-01-08-18-48-00-bcf3d615-9c04-44ec-aac9-25f966490aa4"
-fullTweetSchema = # FILL_IN
-fullTweetDF = # FILL_IN
+# path = "/mnt/training/twitter/firehose/2018/*/*/*/*"
+
+fullTweetSchema = StructType([
+  StructField("id", LongType(), True),
+  StructField("user", StructType([
+    StructField("id", LongType(), True),
+    StructField("screen_name", StringType(), True),
+    StructField("location", StringType(), True),
+    StructField("friends_count", IntegerType(), True),
+    StructField("followers_count", IntegerType(), True),
+    StructField("description", StringType(), True)
+  ]), True),
+  StructField("entities", StructType([
+    StructField("hashtags", ArrayType(
+      StructType([
+        StructField("text", StringType(), True)
+      ]),
+    ), True),
+    StructField("urls", ArrayType(
+      StructType([
+        StructField("url", StringType(), True),
+        StructField("expanded_url", StringType(), True),
+        StructField("display_url", StringType(), True)
+      ]),
+    ), True)
+  ]), True),
+  StructField("lang", StringType(), True),
+  StructField("text", StringType(), True),
+  StructField("created_at", StringType(), True)
+])
+
+fullTweetDF = spark.read.schema(fullTweetSchema).json(path)
+fullTweetDF.printSchema()
+display(fullTweetDF)
 
 # COMMAND ----------
 
@@ -226,7 +277,9 @@ print("Tests passed!")
 # COMMAND ----------
 
 # TODO
-fullTweetFilteredDF = # FILL_IN
+fullTweetFilteredDF = (fullTweetDF
+   .filter("id is not NULL")
+)
 
 # COMMAND ----------
 
@@ -247,9 +300,19 @@ print("Tests passed!")
 
 # COMMAND ----------
 
-# TODO
+from pyspark.sql.functions import unix_timestamp
+from pyspark.sql.types import TimestampType
+
 timestampFormat = "EEE MMM dd HH:mm:ss ZZZZZ yyyy"
-tweetDF = # FILL_IN
+
+tweetDF = fullTweetFilteredDF.select(col("id").alias("tweetID"), 
+  col("user.id").alias("userID"), 
+  col("lang").alias("language"),
+  col("text"),
+  unix_timestamp("created_at", timestampFormat).cast(TimestampType()).alias("createdAt")
+)
+
+display(tweetDF)
 
 # COMMAND ----------
 
@@ -270,8 +333,15 @@ print("Tests passed!")
 
 # COMMAND ----------
 
-# TODO
-accountDF = # <<FILL_IN>>
+accountDF = fullTweetFilteredDF.select(col("user.id").alias("userID"), 
+    col("user.screen_name").alias("screenName"),
+    col("user.location"),
+    col("user.friends_count").alias("friendsCount"),
+    col("user.followers_count").alias("followersCount"),
+    col("user.description")
+)
+
+display(accountDF)
 
 # COMMAND ----------
 
@@ -329,8 +399,23 @@ print("Tests passed!")
 # COMMAND ----------
 
 # TODO
-hashtagDF = # FILL_IN
-urlDF = # FILL_IN
+from pyspark.sql.functions import explode, col
+
+hashtagDF = fullTweetFilteredDF.select(col("id").alias("tweetID"), 
+    explode(col("entities.hashtags.text")).alias("hashtag")
+)
+
+urlDF = (fullTweetFilteredDF.select(col("id").alias("tweetID"), 
+    explode(col("entities.urls")).alias("urls"))
+  .select(
+    col("tweetID"),
+    col("urls.url").alias("URL"),
+    col("urls.display_url").alias("displayURL"),
+    col("urls.expanded_url").alias("expandedURL"))
+)
+
+hashtagDF.show()
+urlDF.show()
 
 # COMMAND ----------
 
@@ -366,7 +451,10 @@ print("Tests passed!")
 # COMMAND ----------
 
 # TODO
-FILL_IN
+accountDF.write.mode("overwrite").save("/tmp/account.parquet")
+tweetDF.write.mode("overwrite").save("/tmp/tweet.parquet")
+hashtagDF.write.mode("overwrite").save("/tmp/hashtag.parquet")
+urlDF.write.mode("overwrite").save("/tmp/url.parquet")
 
 # COMMAND ----------
 
